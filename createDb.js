@@ -1,14 +1,14 @@
 var mongoose = require('./libs/mongoose');
-var User = require('./models/user').User;
+mongoose.set('debug', true);
 var async = require('async');
 
 async.series([
   open,
   dropDatabase,
-  createUsers,
-  close
+  requireModels,
+  createUsers
 ], function (err, results) {
-  console.log(results);
+  mongoose.disconnect();
   console.log(arguments);
 });
 
@@ -21,30 +21,22 @@ function dropDatabase(callback) {
   db.dropDatabase(callback);
 }
 
+function requireModels(callback) {
+  require('./models/user').User;
+
+  async.each(Object.keys(mongoose.models), function (modelName, callback) {
+    mongoose.models[modelName].ensureIndexes(callback);
+  }, callback);
+}
+
 function createUsers(callback) {
-  async.parallel([
-    function (callback) {
-      var vasya = new User({ username: 'Vasya', password: 'supervasya' });
-      vasya.save(function (err) {
-        callback(err, vasya)
-      });
-    },
-    function (callback) {
-      var petya = new User({ username: 'Petya', password: '123' });
-      petya.save(function (err) {
-        callback(err, petya)
-      });
-    },
-    function (callback) {
-      var admin = new User({ username: 'admin', password: 'thetruehero' });
-      admin.save(function (err) {
-        callback(err, admin)
-      });
-    }
-  ], callback);
+  var users = [
+    { username: 'Vasya', password: 'supervasya' },
+    { username: 'Vasya', password: '123' },
+    { username: 'admin', password: 'thetruehero' }
+  ];
+  async.each(users, function (userData, callback) {
+    var user = new mongoose.models.User(userData);
+    user.save(callback);
+  }, callback)
 }
-
-function close(callback) {
-  mongoose.disconnect(callback);
-}
-
